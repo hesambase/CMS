@@ -1,0 +1,120 @@
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+
+@page "/article/{articleSlug}"
+
+@using BlazorConduit.Client.Models.Articles.Dtos
+@using BlazorConduit.Client.Services.Contracts
+@using BlazorConduit.Client.Store.State 
+@using Fluxor
+
+@inject IState<ArticleState> ArticleState
+@inject IState<UserState> UserState
+@inject IStateFacade StateFacade
+@inject NavigationManager Navigation
+
+@if (!(article is null) && !(article.Author is null))
+{
+    <div class="article-page">
+
+        <div class="banner">
+            <div class="container">
+
+                <h1 id="article-title">@article.Title</h1>
+
+                <div class="article-meta">
+                    <a @onclick="() => StateFacade.GetUserProfile(string.IsNullOrWhiteSpace(article.Author.Username) ? string.Empty : article.Author.Username)"><img src="@article.Author.Image" /></a>
+                    <div class="info">
+                        <a href="" class="author">@article.Author.Username</a>
+                        <span class="date">@article.CreatedAt.ToShortDateString()</span>
+                    </div>
+
+                    <ArticleMeta Article="article" IsFollowing="isFollowing"/>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="container page">
+
+            <div class="row article-content">
+                <div class="col-md-12">
+                    @article.Body
+                </div>
+            </div>
+
+            <hr />
+
+            <div class="article-actions">
+                <div class="article-meta">
+                    <a @onclick="() => StateFacade.GetUserProfile(string.IsNullOrWhiteSpace(article.Author.Username) ? string.Empty : article.Author.Username)"><img src="@article.Author.Image" /></a>
+                    <div class="info">
+                        <a @onclick="() => StateFacade.GetUserProfile(string.IsNullOrWhiteSpace(article.Author.Username) ? string.Empty : article.Author.Username)" class="author">@article.Author.Username</a>
+                        <span class="date">@article.CreatedAt.ToShortTimeString()</span>
+                    </div>
+
+                    <ArticleMeta Article="article" IsFollowing="isFollowing" />
+                </div>
+            </div>
+
+            <div class="row">
+                <ArticleCommentList Comments="ArticleState.Value.CurrentCommentList" Slug="@ArticleSlug"/>                
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+
+    private ArticleDto? article;
+
+    private bool isFollowing;
+
+    [Parameter]
+    public string? ArticleSlug { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        ArticleState.StateChanged += OnArticleLoaded;
+
+        if (string.IsNullOrWhiteSpace(ArticleSlug))
+        {
+            // Navigate back to home if no slug is found
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        // Load the article from the store, if the slugs match
+        if (string.Equals(ArticleSlug, ArticleState.Value.CurrentArticle?.Slug))
+        {
+            article = ArticleState.Value.CurrentArticle;
+        }
+        else
+        {
+            // Load the article by slug
+            StateFacade.RetrieveArticle(ArticleSlug);
+        }
+    }
+
+    private void OnArticleLoaded(object sender, ArticleState state)
+    {
+        article = state.CurrentArticle;
+
+        if (state.IsFollowingUser.HasValue)
+        {
+            isFollowing = state.IsFollowingUser.Value;
+        }
+        else if (!(state.CurrentArticle is null) && !(state.CurrentArticle.Author is null))
+        {
+            isFollowing = state.CurrentArticle.Author.Following;
+        }
+        else
+        {
+            isFollowing = false;
+        }
+
+        StateHasChanged();
+    }
+
+}

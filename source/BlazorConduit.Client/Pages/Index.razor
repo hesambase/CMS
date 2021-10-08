@@ -1,0 +1,134 @@
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+
+@page "/"
+
+@using BlazorConduit.Client.Models.Common
+@using BlazorConduit.Client.Pages.Article
+@using BlazorConduit.Client.Services.Contracts
+@using BlazorConduit.Client.Store.State
+@using Fluxor
+
+@inject IStateFacade StateFacade
+@inject IState<ArticleState> ArticleState
+@inject IState<UserState> UserState
+@inject IState<TagState> TagState
+
+<div class="home-page">
+
+    <div class="banner">
+        <div class="container">
+            <h1 class="logo-font">conduit</h1>
+            <p>A place to share your knowledge.</p>
+        </div>
+    </div>
+
+    <div class="container page">
+        <div class="row">
+
+            <div class="col-md-9">
+                <div class="feed-toggle">
+                    <ul class="nav nav-pills outline-active">
+
+                        @if (!UserState.Value.IsAuthenticated)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link active cursor-pointer">Global Feed</a>
+                            </li>
+                        }
+                        else if (isTagFeed)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link cursor-pointer" @onclick="() => OnFeedArticleClicked(UserProfileInteractionContext.Feed)">Your Feed</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link cursor-pointer" @onclick="() => OnFeedArticleClicked(UserProfileInteractionContext.Global)">Global Feed</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link active">
+                                    <i class="ion-pound"></i>
+                                    <span>@ArticleState.Value.CurrentSearchRequest!.Tag</span>
+                                </a>
+                            </li>
+                        }
+                        else if (feedContext == UserProfileInteractionContext.Feed)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link active">Your Feed</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link cursor-pointer" @onclick="() => OnFeedArticleClicked(UserProfileInteractionContext.Global)">Global Feed</a>
+                            </li>
+                        }
+                        else if (feedContext == UserProfileInteractionContext.Global)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link cursor-pointer" @onclick="() => OnFeedArticleClicked(UserProfileInteractionContext.Feed)">Your Feed</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link active">Global Feed</a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+
+                <ArticleList Articles="ArticleState.Value.CurrentArticleList"
+                             MostRecentArticleInteraction="ArticleState.Value.CurrentArticle"
+                             PageLimit="10"
+                             IsLoading="ArticleState.Value.IsLoading" />
+
+            </div>
+
+            @* Display the tag list *@
+            @if (!(TagState.Value.Tags is null) && TagState.Value.Tags.Any())
+            {
+                <div class="col-md-3">
+                    <div class="sidebar">
+                        <p>Popular Tags</p>
+
+                        <div class="tag-list">
+                            @foreach (var tag in TagState.Value.Tags)
+                            {
+                                <a style="cursor: pointer;" @onclick="() => StateFacade.GetArticles(tag: tag, limit: 10, offset: 0)" class="tag-pill tag-default">@tag</a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+        </div>
+    </div>
+
+</div>
+
+@code {
+
+    private UserProfileInteractionContext feedContext;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        // Load the global article feed
+        feedContext = UserProfileInteractionContext.Global;
+        StateFacade.GetArticles(limit: 10, offset: 0);
+        StateFacade.LoadTags();
+    }
+
+    private void OnFeedArticleClicked(UserProfileInteractionContext context)
+    {
+        switch (context)
+        {
+            case UserProfileInteractionContext.Global:
+                StateFacade.GetArticles(limit: 10, offset: 0);
+                feedContext = UserProfileInteractionContext.Global;
+                break;
+            default:
+                StateFacade.GetFeed(limit: 10, offset: 0);
+                feedContext = UserProfileInteractionContext.Feed;
+                break;
+        }
+    }
+
+    private bool isTagFeed => !(ArticleState.Value.CurrentSearchRequest is null) && !string.IsNullOrWhiteSpace(ArticleState.Value.CurrentSearchRequest.Tag);
+
+}

@@ -1,0 +1,59 @@
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+
+@page "/login"
+
+@using BlazorConduit.Client.Models.Authentication.Dtos
+@using BlazorConduit.Client.Models.Authentication.Requests
+@using BlazorConduit.Client.Models.Authentication.Validation
+@using BlazorConduit.Client.Services.Contracts
+@using BlazorConduit.Client.Store.State
+@using Fluxor
+
+@inject IState<UserState> State
+@inject IStateFacade StateFacade
+
+<div class="auth-page">
+    <div class="container page">
+        <div class="row">
+
+            <div class="col-md-6 offset-md-3 col-xs-12">
+                <h1 class="text-xs-center">Sign in</h1>
+                <p class="text-xs-center">
+                    <a href="/register">Need an account?</a>
+                </p>
+
+                <CustomValidationForm TState="UserState" State="State" ButtonText="Sign in" SubmitClickedCallback="OnSignInClicked" ValidationObject="validationModel">
+                    <fieldset class="form-group">
+                        <InputText id='login-email-field' class="form-control form-control-lg" placeholder="Email" type="email" @bind-Value="validationModel.Email" />
+                    </fieldset>
+                    <fieldset class="form-group">
+                        <InputText id='login-password-field' class="form-control form-control-lg" placeholder="Password" type="password" @bind-Value="validationModel.Password" />
+                    </fieldset>
+                </CustomValidationForm>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+
+    private LoginUserValidationModel validationModel = new LoginUserValidationModel();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+    }
+
+    private void OnSignInClicked(bool isValid)
+    {
+        if (isValid)
+        {
+            // The validation model ensures the strings are not null/empty, let the compiler know with the bang (!) operator
+            var userLoginDto = new LoginUserDto(validationModel.Email!, validationModel.Password!);
+            var userLoginRequest = new LoginUserRequest(userLoginDto);
+
+            StateFacade.LoginUser(userLoginRequest);
+        }
+    }
+}

@@ -1,0 +1,195 @@
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+
+@page "/profile/{username}"
+
+@using BlazorConduit.Client.Models.Common
+@using BlazorConduit.Client.Models.Profiles
+@using BlazorConduit.Client.Pages.Article
+@using BlazorConduit.Client.Services.Contracts
+@using BlazorConduit.Client.Store.State
+@using Fluxor 
+
+@inject IState<ProfileState> ProfileState
+@inject IState<UserState> UserState
+@inject IState<ArticleState> ArticleState  
+@inject IStateFacade StateFacade
+@inject NavigationManager Navigation
+
+@if (ProfileState.Value.IsLoading)
+{
+    <span>Loading profile...</span>
+}
+else if (!(userProfile is null))
+{
+    <div class="profile-page">
+
+        <div class="user-info">
+            <div class="container">
+
+                @* Header stuff *@
+                <div class="row">
+                    <div class="col-xs-12 col-md-10 offset-md-1">
+                        <img src="@userProfile.Image" class="user-img" />
+                        <h4>@userProfile.Username</h4>
+                        <p>@userProfile.Bio</p>
+                        @if (isCurrentUser)
+                        {
+                            <button @onclick="NavigateToSettings" class="btn btn-sm btn-outline-secondary action-btn">
+                                <i class="ion-gear-a"></i>
+                                &nbsp;
+                                Edit Profile Settings
+                            </button>
+                        }
+                        else if (userProfile.Following)
+                        {
+                            <button @onclick="() => InteractWithUserProfile(UserProfileInteractionContext.Unfollow)" class="btn btn-sm btn-outline-secondary action-btn">
+                                <i class="ion-minus-round"></i>
+                                &nbsp;
+                                Unfollow @userProfile.Username
+                            </button>
+                        }
+                        else
+                        {
+                            <button @onclick="() => InteractWithUserProfile(UserProfileInteractionContext.Follow)" class="btn btn-sm btn-outline-secondary action-btn">
+                                <i class="ion-plus-round"></i>
+                                &nbsp;
+                                Follow @userProfile.Username
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="row">
+
+                <div class="col-xs-12 col-md-10 offset-md-1">
+                    <div class="articles-toggle">
+                        <ul class="nav nav-pills outline-active">
+                            @if (feedContext == UserProfileInteractionContext.Authored)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link active">My Articles</a>
+                                </li>
+                                <li class="nav-item" style="cursor: pointer;">
+                                    <a class="nav-link" @onclick="() => OnFeedArticleClicked(UserProfileInteractionContext.Favorited)">Favorited Articles</a>
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="nav-item" style="cursor: pointer;">
+                                    <a class="nav-link" @onclick="() => OnFeedArticleClicked(UserProfileInteractionContext.Authored)">My Articles</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link active">Favorited Articles</a>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+
+                    <ArticleList
+                            Articles="ArticleState.Value.CurrentArticleList"
+                            MostRecentArticleInteraction="ArticleState.Value.CurrentArticle"
+                            PageLimit="5"
+                            IsLoading="ArticleState.Value.IsLoading" />
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {        
+
+    private UserProfileDto? userProfile;
+
+    private bool isCurrentUser;
+
+    private UserProfileInteractionContext feedContext;
+
+    [Parameter]
+    public string? Username { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Username))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        await base.OnInitializedAsync();
+
+        ProfileState.StateChanged += RefreshProfileState;
+        StateFacade.GetUserProfile(Username);
+        feedContext = UserProfileInteractionContext.Authored;
+        StateFacade.GetArticles(author: Username, limit: 5, offset: 0);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            base.Dispose(disposing);
+        }
+    }
+
+    private void RefreshProfileState(object sender, ProfileState state)
+    {
+        userProfile = state.CurrentProfile;
+        isCurrentUser = IsCurrentUserProfile(state);
+
+        StateHasChanged();
+    }
+
+    private bool IsCurrentUserProfile(ProfileState state)
+    {
+        // No profile or current user, default to false
+        if (state.CurrentProfile is null || UserState.Value.CurrentUser is null)
+        {
+            return false;
+        }
+
+        // No profile or user username, default to false
+        if (string.IsNullOrWhiteSpace(state.CurrentProfile.Username) || string.IsNullOrWhiteSpace(UserState.Value.CurrentUser.Username))
+        {
+            return false;
+        }
+
+        return string.Equals(state.CurrentProfile.Username, UserState.Value.CurrentUser.Username);
+    }
+
+    private void NavigateToSettings()
+    {
+        Navigation.NavigateTo("/settings");
+    }
+
+    private void InteractWithUserProfile(UserProfileInteractionContext context)
+    {
+        switch (context)
+        {
+            case UserProfileInteractionContext.Follow:
+                StateFacade.FollowUserProfile(Username!);
+                break;
+            default:
+                StateFacade.UnfollowUserProfile(Username!);
+                break;
+        }
+    }
+
+    private void OnFeedArticleClicked(UserProfileInteractionContext context)
+    {
+        switch (context)
+        {
+            case UserProfileInteractionContext.Authored:
+                StateFacade.GetArticles(author: Username, limit: 5, offset: 0);
+                feedContext = UserProfileInteractionContext.Authored;
+                break;
+            default:
+                StateFacade.GetArticles(favorited: Username, limit: 5, offset: 0);
+                feedContext = UserProfileInteractionContext.Favorited;
+                break;
+        }
+    }
+
+}

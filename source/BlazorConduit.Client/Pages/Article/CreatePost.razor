@@ -1,0 +1,71 @@
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+
+@page "/editor"
+
+
+@using BlazorConduit.Client.Models.Articles.Dtos
+@using BlazorConduit.Client.Models.Articles.Requests
+@using BlazorConduit.Client.Models.Articles.Validation
+@using BlazorConduit.Client.Services.Contracts
+@using BlazorConduit.Client.Store.State
+@using Fluxor
+
+@inject IStateFacade StateFacade
+@inject IState<ArticleState> State
+
+<div class="editor-page">
+    <div class="container page">
+        <div class="row">
+
+            <div class="col-md-10 offset-md-1 col-xs-12">
+                <CustomValidationForm TState="ArticleState" State="State" ValidationObject="validationModel" SubmitClickedCallback="OnPublishButtonClicked" ButtonText="Publish Article">
+                    <fieldset class="form-group">
+                        <InputText id="create-post-title" class="form-control form-control-lg" placeholder="Article Title" @bind-Value="validationModel.Title" />
+                    </fieldset>
+                    <fieldset class="form-group">
+                        <InputText id="create-post-description" class="form-control" placeholder="What's this article about?" @bind-Value="validationModel.Description" />
+                    </fieldset>
+                    <fieldset class="form-group">
+                        <InputTextArea id="create-post-body" class="form-control" rows="8" placeholder="Write your article (in markdown)" @bind-Value="validationModel.Body" />
+                    </fieldset>
+                    <fieldset class="form-group">
+                        <InputText class="form-control" placeholder="Enter tags" @bind-Value="tagList" /><div class="tag-list"></div>
+                    </fieldset>
+                </CustomValidationForm>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+
+    private CreateArticleValidationModel validationModel = new CreateArticleValidationModel();
+
+    private string? tagList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+    }
+
+    private void OnPublishButtonClicked(bool isValid)
+    {
+        if (isValid)
+        {
+            var tokenizedTags = new string[] { };
+
+            // Parse the tag list into a string array to send on the create request
+            if (!string.IsNullOrWhiteSpace(tagList))
+            {
+                tokenizedTags = tagList.Split(" ");
+            }
+
+            var createArticleDto = new CreateArticleDto(validationModel.Title!, validationModel.Description!, validationModel.Body!, tokenizedTags);
+            var createArticleRequest = new CreateArticleRequest(createArticleDto);
+
+            StateFacade.CreateArticle(createArticleRequest);
+        }
+    }
+
+}
